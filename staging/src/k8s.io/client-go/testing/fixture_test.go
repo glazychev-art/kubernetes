@@ -78,6 +78,40 @@ func TestWatchCallNonNamespace(t *testing.T) {
 	assert.Equal(t, testObj, out.Object, "watched object mismatch")
 }
 
+func TestWatchCallAndModifyNonNamespace(t *testing.T) {
+	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
+	accessor, err := meta.Accessor(testObj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns := accessor.GetNamespace()
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	watch, err := o.Watch(testResource, ns)
+	if err != nil {
+		t.Fatalf("test resource watch failed in %s: %v ", ns, err)
+	}
+	go func() {
+		err := o.Create(testResource, testObj, ns)
+		if err != nil {
+			t.Errorf("test resource creation failed: %v", err)
+		}
+		// Potential data race
+		_, err = o.Get(testResource, ns, testObj.GetName())
+		if err != nil {
+			t.Errorf("test resource getting failed: %v", err)
+		}
+	}()
+	out := <-watch.ResultChan()
+
+	// Modify received object
+	// Potential data race
+	outCasted := out.Object.(*unstructured.Unstructured)
+	outCasted.Object["data"] = strconv.Itoa(rand.Int())
+}
+
 func TestWatchCallAllNamespace(t *testing.T) {
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")

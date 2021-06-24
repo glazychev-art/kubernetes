@@ -400,7 +400,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
 			for _, w := range t.getWatches(gvr, ns) {
-				w.Modify(obj)
+				w.Modify(obj.DeepCopyObject())
 			}
 			t.objects[gvr][namespacedName] = obj
 			return nil
@@ -416,7 +416,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	t.objects[gvr][namespacedName] = obj
 
 	for _, w := range t.getWatches(gvr, ns) {
-		w.Add(obj)
+		w.Add(obj.DeepCopyObject())
 	}
 
 	return nil
